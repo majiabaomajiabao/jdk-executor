@@ -1,0 +1,21 @@
+实验结论:
+
+ThreadPoolExecutor有一个需要注意的地方：
+当线程数量小于corePoolSize时，new Worker(Runnable firstTask) {
+    setState(-1); // inhibit interrupts until runWorker
+    this.firstTask = firstTask;
+    this.thread = getThreadFactory().newThread(this);
+}的时候，要注意创建出来的thread中的runnable对象已经变成了this，指的是ThreadPoolExecutor.Worker对象并将这个对象添加hashset中，
+当调用这个thread.start时会从直接直接执行这个Worker对象里的线程，执行完，会调用getTask方法从queue队列取下一个task执行。
+如果线程数量大于corePoolSize，并且可以正常添加到queue中。
+
+
+小结：线程池从开始到执行结束核心线程数一旦创建，就不会减少，且一直是当初的那几个线程，只有在遍历完所有任务后才结束这个线程数。
+后来的执行都是通过getTask()从队列中获取，只相当于调用了Runnable的run方法调用，并不是创建线程，真正创建线程是上面的那段代码，
+只有一开始的worker进来的时候会创建线程，然后并发地从queue中取task执行。
+
+需要注意的keepAliveTime，当线程的数量大于核心时，在getTask的时候等待的最大时间，其实它在某种程度上影响了这个线程的生命长短。
+
+多线程到底节约了什么？
+如果没有多线程，每次都执行start方法重新开一个线程，设计了操作系统的原语调用。有了多线程后，不用每次start，而是每次直接是一个run方法调用，
+执行完后，接着下一个任务的run方法，完全不涉及操作系统的线程原语，只是一个方法调用而已
